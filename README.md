@@ -1,171 +1,169 @@
- # 🦊 Robot Agent Vue — 数字人 3D 交互前端
+# Gura Agent — 数字人 3D 交互前端
 
- > **基于 Vue 3 + Three.js 的数字人前端 + Python FastAPI + WebSocket 后端**。与数字人后端连接，实现 3D 模型驱动、语音唤醒、实时对话与动作反馈。
+> 基于 Vue 3 + Vite + Three.js 的 Gawr Gura 数字人前端。模型与动作由 Blender 制作并打包进 GLB，前端通过 WebSocket 与后端对话服务连接。
 
- ## 项目概述
+## 项目概述
 
- 一套完整的数字人对话系统。前端加载 3D 小狐狸模型（Three.js），通过 WebSocket 连接 Python 后端。用户通过语音或文字与数字人交互，后端基于大语言模型（Qwen）进行对话管理，驱动小狐狸做出摇尾巴、挥手、摆手等生动动作。
+Gura Agent 是一个带 3D 数字人的实时对话前端：
 
- ## 技术栈
+- 加载 Gawr Gura 模型，支持骨骼动画
+- 7 个动作按钮，可单独预览：待机、走路、跑步、摇晃、跳跃、害羞、转圈
+- 响应式布局，桌面端左右分栏，移动端上下分栏
+- 文字输入、WebSocket 状态、语音监听等交互入口
 
- | 层级 | 技术 |
- |------|------|
- | **前端框架** | Vue 3 (Composition API) + Vite + Pinia |
- | **3D 渲染** | Three.js (GLTF 模型 + 骨骼动画) |
- | **后端框架** | Python FastAPI + Uvicorn + WebSocket |
- | **语音识别 (ASR)** | DashScope paraformer-realtime-v1 + VAD 静音检测 |
- | **语音合成 (TTS)** | DashScope qwen3-tts-flash |
- | **大语言模型** | Qwen (qwen-max / qwen-omni-flash) via OpenAI API |
- | **音频处理** | AlsaRecorder / AlsaPlayer（跨平台支持） |
- | **MCP 扩展** | MCP 协议支持外部工具调用 |
+## 技术栈
 
- ## 功能特性
+| 层级 | 技术 |
+|------|------|
+| 前端框架 | Vue 3 (Composition API) + Vite + Pinia |
+| 3D 渲染 | Three.js + GLTFLoader + AnimationMixer |
+| 模型/动作 | GLB，动作由 Blender NLA 导出后合并回原模型 |
+| 后端通信 | WebSocket + FastAPI |
+| 语音交互 | DashScope ASR / TTS + Qwen 对话 |
 
- ### 前端（本仓库）
- - **3D 数字人模型**：GLB 小狐狸模型，支持骨骼动画
- - **状态驱动的动作反馈**：
-   - 连接成功 → 摇尾巴
-   - 唤醒成功 → 挥手（5 秒后恢复摇头待机）
-   - 对话中 → 摆手
-   - 告别 → 挥手 + 说再见
- - **WebSocket 实时通信**：心跳保活、状态同步
- - **语音唤醒与对话**：通过麦克风监听，检测唤醒词后开始对话
- - **文字输入兜底**：支持文字消息发送
- - **聊天界面**：对话气泡展示 + 连接状态指示
+## 快速开始
 
- ### 后端（[ZJR-FZD/srp_backend](https://github.com/ZJR-FZD/srp_backend)）
- - **FastAPI WebSocket 服务**：端口 8000，`/ws/conversation` 端点
- - **唤醒词系统**：支持「你好小狐狸」「小狐狸」「hey fox」唤醒
- - **对话状态机**：`waiting_wake → awakened → conversing → idle → goodbye`
- - **VAD 智能语音检测**：自动检测语音开始/结束（0.5 秒静音判定）
- - **语音对话流程**：ASR 识别 → LLM 理解 → 检索增强 → TTS 播报
- - **MCP 工具集成**：支持外部工具调用（如天气查询、信息检索）
- - **任务调度系统**：统一任务队列 + 优先级调度 + 超时重试
- - **永久待机**：对话结束后自动回到唤醒监听状态
+```bash
+npm install
+npm run dev
+```
 
- ## 交互流程
+默认地址：<http://localhost:5173>
 
- ```
- 1. 页面加载 → 加载 3D 模型 + 连接 WebSocket
- 2. 连接成功 → 摇尾巴，开始麦克风监听
- 3. 用户说「你好小狐狸」→ 唤醒成功，挥手，进入对话
- 4. 用户提问 → 后端 ASR → LLM → TTS，小狐狸摆手
- 5. 用户说「再见」/ 静默 30 秒 → 告别，回到待唤醒
- 6. 循环回到步骤 3
- ```
+其他命令：
 
- ## 快速开始
+```bash
+npm run build      # 生产构建
+npm run preview    # 预览生产构建
+npm run lint       # ESLint 检查并自动修复
+```
 
- ### 后端（[ZJR-FZD/srp_backend](https://github.com/ZJR-FZD/srp_backend)）
- ```bash
- git clone https://github.com/ZJR-FZD/srp_backend
- cd srp_backend
+前端不依赖后端也能启动。没有后端时页面会显示离线状态，3D 模型和 7 个动作按钮仍然可以正常预览。
 
- # 安装依赖（推荐 uv）
- pip install -r requirements.txt
- # 或
- uv sync
+## 模型与动作说明
 
- # 配置环境变量
- cp .env.example .env
- # 编辑 .env 填入 DASHSCOPE_API_KEY / OPENAI_API_KEY 等
+生产环境使用 `public/古拉_actions.glb`，`src/model.js` 会加载该文件并把 7 个动作注册到 `AnimationMixer`。
 
- # 启动后端服务
- python main.py
- # 或
- python api/websocket_server.py
- # 默认 WebSocket 端口 8000
- ```
+| 前端按钮 | GLB 动画名 | 时长（约） | 说明 |
+|----------|------------|-----------|------|
+| 待机 | `idle` | 1.2s 循环 | 自然待机循环动作 |
+| 走路 | `ParadeWalk` | 0.7s | 慢速走路摆臂 |
+| 跑步 | `GuraRun` | 1.2s | 跑步摆臂 |
+| 摇晃 | `GuraShake` | 2.1s | 身体左右摇晃 |
+| 跳跃 | `GuraJump` | 1.2s | 原地跳跃 |
+| 害羞 | `Shy` | 2.6s | 低头害羞 |
+| 转圈 | `Gura Around` | 1.8s | 原地转圈 |
 
- ### 前端（本仓库）
- ```bash
- npm install
- npm run dev
- # 默认 http://localhost:5173
- ```
+动作切换采用 0.35s 淡入淡出。非待机动作播放完成后会自动回到待机动作。
 
- ## 项目结构
+### 模型文件
 
- ```
- robot-agent-vue/              # ← 本仓库（前端）
- ├── src/
- │   ├── App.vue                        # 主页面布局
- │   ├── index.js                       # Three.js 场景初始化
- │   ├── model.js                       # 3D 模型加载与骨骼动画控制
- │   ├── components/
- │   │   ├── Model.vue                  # 3D 模型渲染容器
- │   │   └── ChatBox.vue               # 聊天对话界面
- │   └── stores/chatStore.js           # WebSocket + 对话状态管理
- └── package.json
+| 文件 | 用途 |
+|------|------|
+| `public/古拉_actions.glb` | 生产模型，包含 7 个已合并的 NLA 动作 |
+| `public/古拉.glb` | Blender 重新导出的古拉模型 |
+| `public/smoller_gura_-_gawr_gura_holomyth.glb` | 原始 Gura 模型 |
+| `public/模型.glb` | 旧版测试模型 |
 
- srp_backend/                  # ← 后端仓库 (ZJR-FZD/srp_backend)
- ├── main.py                          # 主入口（新架构）
- ├── config.py                        # 全局配置（模型/API/任务参数）
- ├── api/websocket_server.py          # FastAPI WebSocket 服务（端口 8000）
- ├── core/
- │   ├── agent.py                     # RobotAgent 核心（动作注册 + 任务调度）
- │   ├── action/
- │   │   ├── base.py                  # Action 基类
- │   │   ├── listen_action_vad.py     # VAD 语音识别 Action
- │   │   ├── speak_action.py          # TTS 语音合成 Action
- │   │   └── conversation_action_enhanced.py  # 增强版对话 Action
- │   ├── client/openai_client.py      # OpenAI API 统一客户端（Qwen）
- │   ├── server/                      # 通信服务器 + 消息路由 + 任务分发
- │   ├── task/                        # 任务模型 + 队列 + 调度器 + 执行器
- │   └── mcp_control/                 # MCP 协议集成（外部工具调用）
- └── util/audio.py                    # 跨平台音频录制/播放
- ```
+### 动作来源
 
- ## API 参考
+动作在 Blender 中按 NLA 轨道拆分，再通过脚本合并回原模型，避免 Blender 重导出破坏模型坐标。
 
- ### WebSocket (`ws://localhost:8000/ws/conversation`)
- | 消息类型 | 方向 | 说明 |
- |----------|------|------|
- | `connected` | 服务端→客户端 | 连接成功，包含唤醒词列表和当前状态 |
- | `state_change` | 服务端→客户端 | 状态变化通知（含 user_input / bot_response） |
- | `listening_started/stopped` | 服务端→客户端 | 麦克风监听状态变化 |
- | `messages_cleared` | 服务端→客户端 | 消息已清空 |
- | `ping` | 客户端→服务端 | 心跳请求 |
- | `pong` | 服务端→客户端 | 心跳响应 |
- | `get_state` | 客户端→服务端 | 查询当前状态 |
- | `current_state` | 服务端→客户端 | 当前状态回复 |
+```bash
+node scripts/merge_gura_nla_actions.mjs
+```
 
- ### HTTP 控制端点
- | 端点 | 方法 | 说明 |
- |------|------|------|
- | `POST /control/start` | HTTP | 启动麦克风监听 |
- | `POST /control/stop` | HTTP | 停止麦克风监听 |
- | `POST /messages/clear` | HTTP | 清空对话历史 |
- | `GET /status` | HTTP | 获取系统运行状态 |
- | `GET /messages` | HTTP | 获取消息列表 |
+辅助脚本：
 
- ## 对话状态机
+- `scripts/build_gura_actions.py`
+- `scripts/merge_gura_actions.mjs`
 
- ```
- ┌─────────────┐    唤醒词     ┌──────────┐    用户提问    ┌───────────┐
- │ waiting_wake │ ─────────→  │ awakened  │ ─────────→  │ conversing │
- └─────────────┘              └──────────┘              └───────────┘
-       ↑                            │                        │
-       │    "再见"                     │  5 秒后自动              │  无语音 30 秒
-       │                            ↓                        │
-       │                        ┌─────────┐                 │
-       └────────────────────────│ goodbye │←────────────────┘
-                                └─────────┘
- ```
+## 项目结构
 
- ## 环境变量
+```
+Gura-Agent/
+├── public/
+│   ├── 古拉_actions.glb
+│   ├── 古拉.glb
+│   └── smoller_gura_-_gawr_gura_holomyth.glb
+├── scripts/
+│   ├── build_gura_actions.py
+│   ├── merge_gura_actions.mjs
+│   └── merge_gura_nla_actions.mjs
+└── src/
+    ├── App.vue
+    ├── index.js
+    ├── main.js
+    ├── model.js
+    ├── style.css
+    ├── components/
+    │   ├── ChatBox.vue
+    │   └── Model.vue
+    └── stores/
+        └── chatStore.js
+```
 
- ```env
- # API 配置（兼容 OpenAI 格式，推荐阿里云 DashScope）
- OPENAI_API_KEY=your-api-key
- OPENAI_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+## 动作控制
 
- # DashScope 密钥（ASR / TTS / Reranker）
- DASHSCOPE_API_KEY=your-dashscope-key
- DASHSCOPE_INTL_API_KEY=your-intl-key
+- `src/model.js`：加载 GLB、注册动画、处理动作淡入淡出和自动回待机
+- `src/components/ChatBox.vue`：动作按钮列表，点击调用 `triggerAction(name)`
+- `src/components/Model.vue`：3D 模型容器、加载状态、头部跟随气泡
 
- # 通信配置
- COMMUNICATION_HOST=0.0.0.0
- COMMUNICATION_PORT=8080
- MAX_WEBSOCKET_CONNECTIONS=100
- ```
+前端内置动作按钮：
+
+```js
+[
+  { name: 'idle', label: '待机' },
+  { name: 'ParadeWalk', label: '走路' },
+  { name: 'GuraRun', label: '跑步' },
+  { name: 'GuraShake', label: '摇晃' },
+  { name: 'GuraJump', label: '跳跃' },
+  { name: 'Shy', label: '害羞' },
+  { name: 'Gura Around', label: '转圈' }
+]
+```
+
+## 后端接口
+
+### WebSocket
+
+默认地址：`ws://localhost:8000/ws/conversation`
+
+| 消息类型 | 方向 | 说明 |
+|----------|------|------|
+| `connected` | 服务端 → 客户端 | 连接成功，包含唤醒词列表 |
+| `state_change` | 服务端 → 客户端 | 状态变化通知 |
+| `listening_started/stopped` | 服务端 → 客户端 | 麦克风监听状态 |
+| `messages_cleared` | 服务端 → 客户端 | 消息已清空 |
+| `ping` | 客户端 → 服务端 | 心跳请求 |
+| `pong` | 服务端 → 客户端 | 心跳响应 |
+| `get_state` | 客户端 → 服务端 | 查询当前状态 |
+| `current_state` | 服务端 → 客户端 | 当前状态回复 |
+
+### HTTP 控制端点
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `POST /control/start` | HTTP | 启动麦克风监听 |
+| `POST /control/stop` | HTTP | 停止麦克风监听 |
+| `POST /messages/clear` | HTTP | 清空对话历史 |
+| `GET /status` | HTTP | 获取系统运行状态 |
+| `GET /messages` | HTTP | 获取消息列表 |
+
+## 常见问题
+
+### 模型没有显示
+
+确认 `public/古拉_actions.glb` 存在。浏览器控制台如果有 GLB 加载失败，可以尝试重新执行：
+
+```bash
+node scripts/merge_gura_nla_actions.mjs
+```
+
+### 动作按钮没有效果
+
+确认 `src/model.js` 中的 `ACTION_NAMES` 与 GLB 内的动画名一致。动画名可通过 Blender 的 Action Editor / NLA 或 GLTF 解析工具查看。
+
+### 端口被占用
+
+如果 `5173` 已被占用，Vite 会自动选择下一个可用端口，例如 `http://localhost:5174`。
