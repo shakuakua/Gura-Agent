@@ -1,76 +1,85 @@
-// index.js
-import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
-import model from './model.js'; // 模型对象
-import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import * as THREE from 'three'
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
+import model from './model.js'
 
-// 场景
-const scene = new THREE.Scene();
-scene.add(model); // 模型对象添加到场景中
+const scene = new THREE.Scene()
+scene.add(model)
 
-// 辅助观察的坐标系
-// const axesHelper = new THREE.AxesHelper(100);
-// scene.add(axesHelper);
-
-// 光源设置
-const directionalLight = new THREE.DirectionalLight(0xffffff, 2.0);
-directionalLight.position.set(25, 50, 100);
-scene.add(directionalLight);
-const ambient = new THREE.AmbientLight(0xffffff, 1.5);
-scene.add(ambient);
-
-// 渲染器和相机
-const width = window.innerWidth;
-const height = window.innerHeight;
-const camera = new THREE.PerspectiveCamera(25, width / height, 1, 3000);
-camera.position.set(-2.4623199219951086,  1.2189353091212818,  12.512804466186772); // 根据渲染范围尺寸数量级设置相机位置
-camera.lookAt( 0,0,0);
+const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 3000)
+camera.position.set(0, 0.65, 11.4)
+camera.lookAt(0, -0.2, 0)
 
 const renderer = new THREE.WebGLRenderer({
-  antialias: true, // 启用内置抗锯齿
-  alpha: true // 如果需要透明背景
-});
-renderer.setSize(width, height);
-console.log('渲染器对象', width, height);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // 限制最大像素比，避免性能问题
-renderer.setClearColor(0x87ceeb, 1.0); // 设置背景颜色白色
+  antialias: true,
+  alpha: true,
+  powerPreference: 'high-performance'
+})
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+renderer.setClearColor(0x000000, 0)
+renderer.outputColorSpace = THREE.SRGBColorSpace
+renderer.toneMapping = THREE.ACESFilmicToneMapping
+renderer.toneMappingExposure = 1.15
 
-// 抗锯齿处理
-// 创建后处理对象EffectComposer，WebGL渲染器作为参数
-const composer = new EffectComposer(renderer);
-const pixelRatio = renderer.getPixelRatio();
-const smaaPass = new SMAAPass(width * pixelRatio, height * pixelRatio);
-composer.addPass(smaaPass);
+const pmremGenerator = new THREE.PMREMGenerator(renderer)
+scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture
 
-// 解决加载gltf格式模型颜色偏差问题
-renderer.outputEncoding = THREE.sRGBEncoding;
+scene.add(new THREE.HemisphereLight(0xffe0b8, 0x1b2540, 1.35))
 
-// 设置相机控件轨道控制器OrbitControls
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.enablePan = false; // 禁止平移
-controls.enableZoom = false; // 禁止缩放
-controls.enableRotate = false; // 禁止旋转
-// 渲染循环
-function render() {
-  renderer.render(scene, camera);
-  requestAnimationFrame(render);
-  // 辅助设置position
-  // console.log('camera.position',camera.position);
-  // 浏览器控制台查看controls.target变化，辅助设置lookAt参数
-  // console.log('controls.target',controls.target);
+const keyLight = new THREE.DirectionalLight(0xffd9a8, 2.2)
+keyLight.position.set(3.5, 6, 7)
+scene.add(keyLight)
+
+const rimLight = new THREE.DirectionalLight(0x49e4dc, 1.5)
+rimLight.position.set(-5, 3.5, -4)
+scene.add(rimLight)
+
+const fillLight = new THREE.DirectionalLight(0xffffff, 0.7)
+fillLight.position.set(0, -1.5, 5)
+scene.add(fillLight)
+
+const starCount = 240
+const starPositions = new Float32Array(starCount * 3)
+for (let i = 0; i < starCount; i += 1) {
+  starPositions[i * 3] = (Math.random() - 0.5) * 16
+  starPositions[i * 3 + 1] = (Math.random() - 0.35) * 10
+  starPositions[i * 3 + 2] = -2 - Math.random() * 8
 }
-render();
 
+const starGeometry = new THREE.BufferGeometry()
+starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3))
+const stars = new THREE.Points(
+  starGeometry,
+  new THREE.PointsMaterial({
+    color: 0xcfe4ff,
+    size: 0.045,
+    transparent: true,
+    opacity: 0.55,
+    sizeAttenuation: true,
+    depthWrite: false
+  })
+)
+scene.add(stars)
 
+const controls = new OrbitControls(camera, renderer.domElement)
+controls.enablePan = false
+controls.enableZoom = false
+controls.enableRotate = false
 
-// 画布跟随窗口变化
-window.onresize = function () {
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-};
+function render() {
+  renderer.render(scene, camera)
+  stars.rotation.y += 0.0004
+  requestAnimationFrame(render)
+}
+render()
 
-// 导出 camera 和 scene
-export { camera, scene };
-export default renderer;
+export function resizeRenderer(nextWidth, nextHeight) {
+  const width = Math.max(1, Math.floor(nextWidth))
+  const height = Math.max(1, Math.floor(nextHeight))
+  renderer.setSize(width, height, false)
+  camera.aspect = width / height
+  camera.updateProjectionMatrix()
+}
+
+export { camera, scene }
+export default renderer

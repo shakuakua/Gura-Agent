@@ -1,145 +1,323 @@
 <template>
   <div ref="modelContainerRef" class="model-container">
-    <!-- Three.js 渲染的模型将在这里显示 -->
-  </div>
+    <div class="stage-bg">
+      <div class="stage-grid"></div>
+      <div class="stage-light"></div>
+    </div>
 
-  <!-- 气泡框 -->
-  <div
-    v-if="latestAIMessage"
-    class="speech-bubble"
-    :style="bubbleStyle"
-  >
-    {{ latestAIMessage }}
+    <Transition name="loader">
+      <div v-if="!modelReady" class="model-loader">
+        <div class="loader-ring"></div>
+        <span>{{ modelError ? '模型加载失败' : '正在唤醒 Gura' }}</span>
+      </div>
+    </Transition>
+
+    <Transition name="bubble">
+      <div v-if="latestAIMessage" class="speech-bubble" :style="bubbleStyle">
+        <div class="bubble-head">
+          <span class="bubble-avatar">🦈</span>
+          <span class="bubble-name">Gura</span>
+        </div>
+        <p class="bubble-text">{{ latestAIMessage }}</p>
+        <span class="bubble-tail"></span>
+      </div>
+    </Transition>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch,onUnmounted } from 'vue'
+defineOptions({ name: 'DigitalModel' })
+
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import * as THREE from 'three'
-import renderer, { camera, scene } from '../index.js' // 导入 camera 和 scene
-import model from '@/model.js'
-import { useChatStore } from '@/stores/chatStore' // 导入聊天状态管理
+import renderer, { camera, resizeRenderer } from '../index.js'
+import { useChatStore } from '@/stores/chatStore'
+import { getModelHeadPosition, waitForModel } from '@/model.js'
 
 const modelContainerRef = ref(null)
-const chatStore = useChatStore() // 使用聊天状态
+const chatStore = useChatStore()
+const modelReady = ref(false)
+const modelError = ref(false)
 
-// 计算属性：获取最新的 AI 消息
 const latestAIMessage = computed(() => {
-  const aiMessages = chatStore.messages.filter(msg => msg.sender === 'ai')
+  const aiMessages = chatStore.messages.filter((msg) => msg.sender === 'ai')
   return aiMessages.length > 0 ? aiMessages[aiMessages.length - 1].text : ''
 })
 
-// 气泡样式（动态绑定位置）
 const bubbleStyle = ref({
-  position: 'absolute',
   left: '50%',
-  top: '20%',
-  transform: 'translate(-50%, -50%)',
-  background: 'white',
-  padding: '15px 25px',
-  borderRadius: '20px',
-  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
-  fontSize: '50px',
-  color: '#333',
-  maxWidth: '100%',
-  textAlign: 'left',
-  zIndex: 100,
-  pointerEvents: 'none'
+  top: '26%'
 })
 
-// 更新气泡位置（绑定到模型头部）
 const updateBubblePosition = () => {
-  if (!model) return
-
-  // 获取模型头部位置,定一个参考点,屏幕中心
-  const anchorPoint = new THREE.Vector3(0,0,0)
-  anchorPoint.project(camera) // 转换为标准化设备坐标 (NDC)
-
-  // 转换为屏幕像素坐标
   const container = modelContainerRef.value
-  const widthHalf = container.clientWidth / 1.4
-  const heightHalf = container.clientHeight / 4
+  if (!container) return
 
-  const x = anchorPoint.x * widthHalf + widthHalf
-  const y = -anchorPoint.y * heightHalf + heightHalf// 向上偏移避免遮挡
+  const anchor = getModelHeadPosition(new THREE.Vector3()).project(camera)
+  const widthHalf = container.clientWidth / 2
+  const heightHalf = container.clientHeight / 2
 
-  bubbleStyle.value.left = `${x}px`
-  bubbleStyle.value.top = `${y}px`
+  let x = anchor.x * widthHalf + widthHalf
+  let y = -anchor.y * heightHalf + heightHalf - 28
+
+  const halfWidth = 170
+  x = THREE.MathUtils.clamp(
+    x,
+    halfWidth + 12,
+    Math.max(halfWidth + 12, container.clientWidth - halfWidth - 12)
+  )
+  const minY = container.clientWidth <= 600 ? 86 : 150
+  y = THREE.MathUtils.clamp(y, minY, Math.max(minY, container.clientHeight - 140))
+
+  bubbleStyle.value = {
+    left: `${x}px`,
+    top: `${y}px`
+  }
 }
 
-onMounted(() => {
-  console.log('onMounted')
-  modelContainerRef.value.appendChild(renderer.domElement)
+let resizeObserver = null
+let bubbleTick = null
 
-  // 初始化气泡位置
+onMounted(() => {
+  const container = modelContainerRef.value
+  if (renderer.domElement.parentElement !== container) {
+    container.appendChild(renderer.domElement)
+  }
+
+  resizeRenderer(container.clientWidth, container.clientHeight)
   updateBubblePosition()
 
-  // 监听消息变化，更新气泡内容和位置
+  waitForModel().then((gltf) => {
+    modelReady.value = Boolean(gltf)
+    modelError.value = !gltf
+    updateBubblePosition()
+  })
+
   watch(
     () => chatStore.messages,
-    () => {
-      console.log('消息更新:', latestAIMessage.value)
-      updateBubblePosition() // 动态调整气泡位置
-    },
+    () => updateBubblePosition(),
     { deep: true }
   )
 
-  // 监听窗口大小变化，重新计算气泡位置
   window.addEventListener('resize', updateBubblePosition)
+  resizeObserver = new ResizeObserver(() => {
+    resizeRenderer(container.clientWidth, container.clientHeight)
+    updateBubblePosition()
+  })
+  resizeObserver.observe(container)
+  bubbleTick = window.setInterval(updateBubblePosition, 180)
 })
 
-// 组件卸载时移除事件监听
 onUnmounted(() => {
   window.removeEventListener('resize', updateBubblePosition)
-    chatStore.initWebSocket()
-    scrollToBottom()
-})
-
-// 暴露方法给父组件调用（如果需要手动更新气泡）
-defineExpose({
-  updateBubbleText: (text) => {
-    console.log('手动更新气泡文本:', text)
-  }
+  if (resizeObserver) resizeObserver.disconnect()
+  if (bubbleTick) window.clearInterval(bubbleTick)
 })
 </script>
 
 <style scoped>
 .model-container {
+  position: relative;
   width: 100%;
   height: 100%;
-  position: relative;
   overflow: hidden;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.1);
-  border-radius: 12px 12px 0 0;
+  background: var(--bg-1);
+  isolation: isolate;
 }
 
-/* 豆包风格气泡样式 */
+.stage-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, #0b0e1a 0%, #101627 48%, #090b12 100%);
+}
+
+.stage-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    120deg,
+    rgba(255, 138, 76, 0.14) 0%,
+    transparent 34%,
+    rgba(57, 214, 208, 0.12) 68%,
+    transparent 100%
+  );
+  mix-blend-mode: screen;
+}
+
+.stage-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.7), transparent 78%);
+  -webkit-mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.7), transparent 78%);
+}
+
+.stage-light {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 30%;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    rgba(57, 214, 208, 0.06) 55%,
+    rgba(255, 138, 76, 0.08)
+  );
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+:deep(canvas) {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.model-loader {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  color: var(--text-soft);
+  font-size: 13px;
+  background: rgba(10, 13, 22, 0.55);
+  backdrop-filter: blur(6px);
+}
+
+.loader-ring {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 138, 76, 0.18);
+  border-top-color: var(--fox);
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loader-enter-active,
+.loader-leave-active {
+  transition: opacity 0.35s ease;
+}
+
+.loader-enter-from,
+.loader-leave-to {
+  opacity: 0;
+}
+
 .speech-bubble {
   position: absolute;
-  background: white;
-  padding: 12px 20px;
-  border-radius: 20px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  font-size: 50px;
-  color: #333;
-  max-width: '100%';
-  text-align: left;
-  z-index: 100;
+  z-index: 5;
+  min-width: 170px;
+  max-width: min(340px, calc(100% - 48px));
+  padding: 12px 16px 14px;
+  transform: translate(-50%, -100%);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 16px;
+  box-shadow:
+    0 18px 45px rgba(0, 0, 0, 0.35),
+    0 4px 14px rgba(255, 138, 76, 0.1);
+  color: #20222b;
+  backdrop-filter: blur(10px);
   pointer-events: none;
 }
 
-/* 气泡尾部箭头 */
-.speech-bubble::after {
-  content: '';
+.bubble-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 6px;
+}
+
+.bubble-avatar {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 13px;
+  background: linear-gradient(135deg, rgba(255, 138, 76, 0.2), rgba(255, 138, 76, 0.06));
+  border: 1px solid rgba(255, 138, 76, 0.3);
+}
+
+.bubble-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: #34364a;
+}
+
+.bubble-text {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  word-break: break-word;
+  white-space: normal;
+}
+
+.bubble-tail {
   position: absolute;
-  bottom: -10px; /* 箭头位于气泡底部 */
-  left: 10px; /* 箭头靠左 */
+  bottom: -9px;
+  left: 50%;
   width: 0;
   height: 0;
-  border-top: 15px solid transparent; /* 顶部透明 */
-  border-bottom: 15px solid transparent; /* 底部透明 */
-  border-left: 15px solid white; /* 右侧为白色，形成向左的箭头 */
+  transform: translateX(-50%);
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-top: 10px solid rgba(255, 255, 255, 0.92);
+}
 
+.bubble-enter-active,
+.bubble-leave-active {
+  transition: opacity 0.28s ease, transform 0.28s ease;
+}
+
+.bubble-enter-from,
+.bubble-leave-to {
+  opacity: 0;
+  transform: translate(-50%, -94%) scale(0.96);
+}
+
+@media (max-width: 600px) {
+  .speech-bubble {
+    min-width: 0;
+    max-width: calc(100% - 32px);
+    padding: 8px 12px 10px;
+    border-radius: 12px;
+  }
+
+  .bubble-head,
+  .bubble-tail {
+    display: none;
+  }
+
+  .bubble-text {
+    max-height: 2.8em;
+    overflow: hidden;
+    font-size: 13px;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
 }
 </style>

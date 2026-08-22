@@ -8,7 +8,7 @@ export const useChatStore = defineStore('chat', {
   state: () => ({
     // 消息列表
     messages: [
-      { text: '你好！我是数字人小狸，有什么可以帮助你的吗？', sender: 'ai', timestamp: new Date() }
+      { text: '你好！我是数字人 Gura，有什么可以帮助你的吗？', sender: 'ai', timestamp: new Date() }
     ],
     // 用户输入消息
     inputMessage: '',
@@ -164,7 +164,7 @@ export const useChatStore = defineStore('chat', {
         case 'messages_cleared':
           // 消息已清空
           this.messages = [
-            { text: '你好！我是数字人小狸，有什么可以帮助你的吗？', sender: 'ai', timestamp: new Date() }
+            { text: '你好！我是数字人 Gura，有什么可以帮助你的吗？', sender: 'ai', timestamp: new Date() }
           ]
           console.log('🗑️ 消息已清空')
           break
@@ -370,7 +370,7 @@ export const useChatStore = defineStore('chat', {
 
         if (data.success) {
           this.messages = [
-            { text: '你好！我是数字人小狸，有什么可以帮助你的吗？', sender: 'ai', timestamp: new Date() }
+            { text: '你好！我是数字人 Gura，有什么可以帮助你的吗？', sender: 'ai', timestamp: new Date() }
           ]
           console.log('🗑️ ' + data.message)
         }
@@ -382,7 +382,7 @@ export const useChatStore = defineStore('chat', {
     // 重置状态
     resetStore() {
       this.messages = [
-        { text: '你好！我是数字人小狸，有什么可以帮助你的吗？', sender: 'ai', timestamp: new Date() }
+        { text: '你好！我是数字人 Gura，有什么可以帮助你的吗？', sender: 'ai', timestamp: new Date() }
       ]
       this.inputMessage = ''
       this.isConnected = false
