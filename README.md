@@ -82,6 +82,20 @@ npm run dev
 | 害羞 | `Shy` | 2.6s | 单次播放 |
 | 转圈 | `Gura Around` | 1.8s | 单次播放 |
 
+#### 动作演示 GIF
+
+演示 GIF 存放在 `public/演示gif/` 目录：
+
+| GIF | 演示 |
+|------|------|
+| 待机 | ![待机演示](public/演示gif/待机.gif) |
+| 走路 | ![走路演示](public/演示gif/走路.gif) |
+| 跑步 | ![跑步演示](public/演示gif/跑步.gif) |
+| 摇晃 | ![摇晃演示](public/演示gif/摇晃.gif) |
+| 跳跃 | ![跳跃演示](public/演示gif/跳跃.gif) |
+| 害羞 | ![害羞演示](public/演示gif/害羞.gif) |
+| 跳舞 | ![跳舞演示](public/演示gif/跳舞.gif) |
+
 ### 3.3 对话交互
 
 - 页面加载后自动连接 `ws://localhost:8000/ws/conversation`
